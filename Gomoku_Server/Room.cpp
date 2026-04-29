@@ -50,7 +50,7 @@ bool Room::VerifyPassword(std::string password)
 		return false;
 }
 
-std::vector<std::pair<int, std::string>>* Room::GetSessionIdList()
+const std::vector<std::pair<int, std::string>>* Room::GetSessionIdList()
 {
 	return &_sessionIdList;
 }

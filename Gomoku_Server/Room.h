@@ -5,6 +5,8 @@
 #include <functional>
 #include <vector>
 
+#include "Gomoku.h"
+
 class Room
 {
 private:
@@ -21,15 +23,22 @@ private:
 	//Server에게 RoomID 반환 및 Map 요소 삭제
 	std::function<void(int)> _destroy_room_callback;
 
+
+
+
 public:
 	Room(int roomId, std::string roomName, std::string roomPassword, std::function<void(int)> func);
+
+	//SessionList에 추가
 	void AddSessionId(int sessionId, std::string nickname);
+	//SessionList에서 삭제 (삭제 후 sessionList가 empty인 경우 room을 서버가 가지고 있는 map에서 삭제)
 	void DeleteSessionId(int sessionId);
+	//방 비밀번호 대조
 	bool VerifyPassword(std::string password);
-	std::vector<std::pair<int, std::string>>* GetSessionIdList();
+	//SessionList 가져오기
+	const std::vector<std::pair<int, std::string>>* GetSessionIdList();
 
 	nlohmann::json ReturnJson();
-
 };
 
 

@@ -3,7 +3,6 @@
 #include "Server.h"
 #include "Database.h"
 
-
 int main()
 {
 	//데이터베이스 싱글톤으로 초기화

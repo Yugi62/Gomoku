@@ -1,0 +1,14 @@
+mysql-connector-c++-8.1.0-winx64/
+x64/
+include/
+*.exe
+*.dll
+*.txt
+*.sln
+*.vcxproj
+*.filters
+*.user
+*.pem
+*.crt
+*.key
+.vs/
