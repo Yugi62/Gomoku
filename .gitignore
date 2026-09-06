@@ -1,4 +1,5 @@
 mysql-connector-c++-8.1.0-winx64/
+Imgui/
 Redis/
 x64/
 include/
@@ -12,4 +13,6 @@ include/
 *.pem
 *.crt
 *.key
+*.ini
+*.lib
 .vs/
