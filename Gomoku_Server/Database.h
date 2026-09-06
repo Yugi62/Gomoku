@@ -14,7 +14,6 @@ private:
 	sql::Connection* con;
 	bool isInit = false;
 
-
 private:
 	Database() {}
 	~Database() {}
@@ -27,7 +26,9 @@ public:
 		return instance;
 	}
 
+	//싱글톤 최초 초기화
 	void Init();
+
 	//user_id가 db에 존재하는지 확인
 	bool CheckUserid(std::string user_id);
 

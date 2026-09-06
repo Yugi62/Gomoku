@@ -12,8 +12,11 @@
 #include <unordered_map>
 #include <nlohmann/json.hpp>
 
+#include "Redis.h"
 #include "Room.h"
 
+
+class Room;
 class IServer;
 
 class Session
@@ -25,14 +28,16 @@ private:
 	unsigned int _sessionId;
 	//이거 id만으로는 정확하게 room에 있는지 없는지 확인이 어려우니깐 bool이라도 만들어야함
 	unsigned int _roomId;
-	//닉네임
+	//세션에 연결된 클라이언트의 닉네임
 	std::string _nickname;
-
+	//j["type"]에 따라 map에 연결된 function 호출용
 	std::unordered_map<std::string, std::function<void(nlohmann::json&)>> _forDispatch;
 
 	boost::asio::ssl::stream<boost::asio::ip::tcp::socket> _socket;
 	boost::asio::strand<boost::asio::io_context::executor_type>& _strand;
 	std::array<char, 4> _buf;
+
+	RedisManager& _redisManager;
 
 	void Start_Handshake();
 	void Start_Read();
@@ -58,10 +63,12 @@ private:
 	void Join_Room(nlohmann::json& j);
 	//방 채팅
 	void Room_Chat(nlohmann::json& j);
-	//플레이어 정보 최신화
-	void Refresh_PlayerInfo(int roomId);
+	//랭킹 전송
+	void Send_Ranking(nlohmann::json& j);
 	//플레이어 게임 준비
 	void Room_Ready();
+	//돌 착수
+	void Place_Stone(nlohmann::json& j);
 	//작업 선별
 	void Start_Dispatch(std::string str);
 
@@ -73,7 +80,8 @@ public:
 		boost::asio::ssl::context& context, 
 		boost::asio::strand<boost::asio::io_context::executor_type>& strand,
 		IServer* iServer,
-		int sessionId
+		int sessionId,
+		RedisManager& redisManager
 	);
 
 	void Start();
@@ -89,6 +97,8 @@ public:
 	virtual std::shared_ptr<Room> Get_Room(int roomId) = 0;
 	virtual std::vector<nlohmann::json> Get_RoomJson() = 0;
 	virtual void Broadcast_Room_Chat(std::string str, int id, int roomId) = 0;
+	virtual void Send_Data(std::string str, int id) = 0;
+	virtual void Refresh_Room_Info(int roomId) = 0;
 
 	virtual ~IServer() = default;
 };
@@ -104,6 +114,8 @@ private:
 	boost::asio::ssl::context _context;
 	boost::asio::strand<boost::asio::io_context::executor_type> _strand;
 
+	RedisManager _redisManager;
+
 	//비동기로 Accpet 시작
 	void Start_Accept();
 	//세션에 부여할 Id 가져오기
@@ -113,30 +125,31 @@ private:
 	std::queue<unsigned int> _roomQueue;
 	std::unordered_map<int, std::shared_ptr<Room>> _roomMap;
 
-
-
-	//방 제거 (map에서 제거하는거는 아직 안 만듬)
+	//방 제거
 	void Destroy_Room(int roomId);
 	
 public:
 	Server(boost::asio::io_context& io, unsigned short port);
 
 
-	//Session에서 호출가능한 함수 목록
+	//Session 및 Room에서 호출가능한 함수 목록
 	//
 	//
 
 	//세션 목록에서 세션 제거 후 세션ID 반환
-	virtual void Destroy_Session(int sessionId);
+	void Destroy_Session(int sessionId) override;
 	//해당 id를 제외한 전원에게 chat를 전달
-	virtual void Broadcast_Chat(std::string str, int id);
+	void Broadcast_Chat(std::string str, int id) override;
 	//방 생성
-	virtual int Create_Room(int sessionId, std::string nickname, std::string roomName, std::string roomPassword);
+	int Create_Room(int sessionId, std::string nickname, std::string roomName, std::string roomPassword) override;
 	//id를 주면 map에 연결된 Room 포인터를 반환 (콜백함수여서 세션에서 사용)
-	virtual std::shared_ptr<Room> Get_Room(int roomId);
+	std::shared_ptr<Room> Get_Room(int roomId) override;
 	//모든 방의 정보를 백터에 넣어서 반환
-	virtual std::vector<nlohmann::json> Get_RoomJson();
+	std::vector<nlohmann::json> Get_RoomJson() override;
 	//해당 id를 제외한 방 인원에게 chat를 전달
-	virtual void Broadcast_Room_Chat(std::string str, int id, int roomId);
-
+	void Broadcast_Room_Chat(std::string str, int id, int roomId) override;
+	//해당 id에게 str(dump 처리 한 json)을 전달
+	void Send_Data(std::string str, int id) override;
+	//방 정보 새로고침
+	void Refresh_Room_Info(int roomId) override;
 };

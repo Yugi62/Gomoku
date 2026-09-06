@@ -6,6 +6,19 @@
 #include <vector>
 
 #include "Gomoku.h"
+#include "Server.h"
+#include "Redis.h"
+
+class IServer;
+
+struct Player
+{
+	int sessionId;
+	std::string nickname;
+	bool isReady = false;
+	bool isMyTurn = false;
+	int color = 2;			
+};
 
 class Room
 {
@@ -19,15 +32,19 @@ private:
 	//Room의 비밀번호
 	std::string _roomPassword;
 	//Room에 존재하는 Session의 Id 목록
-	std::vector<std::pair<int, std::string>> _sessionIdList;
+	std::vector<Player> _sessionIdList;
 	//Server에게 RoomID 반환 및 Map 요소 삭제
 	std::function<void(int)> _destroy_room_callback;
+	//Room 안에서 ready한 플레이어의 수
+	int readyCnt = 0;
 
+	IServer* _iServer;
+	Gomoku gomoku;
 
-
+	RedisManager& _redisManager;
 
 public:
-	Room(int roomId, std::string roomName, std::string roomPassword, std::function<void(int)> func);
+	Room(IServer* iServer, int roomId, std::string roomName, std::string roomPassword, std::function<void(int)> func, RedisManager& redisManager);
 
 	//SessionList에 추가
 	void AddSessionId(int sessionId, std::string nickname);
@@ -36,18 +53,19 @@ public:
 	//방 비밀번호 대조
 	bool VerifyPassword(std::string password);
 	//SessionList 가져오기
-	const std::vector<std::pair<int, std::string>>* GetSessionIdList();
+	const std::vector<Player>* GetSessionIdList();
+	//게임 준비 설정 (모든 플레이어가 준비된 경우 게임 시작)
+	void SetReady(int sessionId);
+
+	//착수
+	void Place_Gomoku_Stone(unsigned int sessionId, int x, int y);
+
+	void Reset_Player_Status();
 
 	nlohmann::json ReturnJson();
+
+
 };
-
-
-
-
-
-
-
-
 
 
 /*
@@ -65,9 +83,6 @@ Manager
 1. 클라이언트가 방번호를 요구
 2. 큐 내부에서 반환된 번호를 먼저 확인 (있는 경우 우선적으로 이것을 반환)
 3. 큐가 없는 경우 int를 반환하고 증가시킴
-
-
-
 
 
 3. Room 안에 들어간 클라이언트의 세션에도 _roomId를 저장할 것

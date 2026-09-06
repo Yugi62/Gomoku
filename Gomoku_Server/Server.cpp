@@ -7,12 +7,14 @@ Session::Session(
 	boost::asio::ssl::context& context, 
 	boost::asio::strand<boost::asio::io_context::executor_type>& strand,
 	IServer* iServer,
-	int sessionId
+	int sessionId,
+	RedisManager& redisManager
 	) :	
 	_socket(std::move(socket), context),
 	_strand(strand),
 	_iServer(iServer),
-	_sessionId(sessionId)
+	_sessionId(sessionId),
+	_redisManager(redisManager)
 {
 	_forDispatch["Login"] = [this](nlohmann::json& j) {Start_Login(j); };
 	_forDispatch["Register"] = [this](nlohmann::json& j) {Start_Register(j); };
@@ -25,6 +27,8 @@ Session::Session(
 	_forDispatch["Join_Room"] = [this](nlohmann::json& j) {Join_Room(j); };
 	_forDispatch["Room_Chat"] = [this](nlohmann::json& j) {Room_Chat(j); };
 	_forDispatch["Room_Ready"] = [this](nlohmann::json& j) {Room_Ready(); };
+	_forDispatch["Place_Stone"] = [this](nlohmann::json& j) {Place_Stone(j); };
+	_forDispatch["Send_Ranking"] = [this](nlohmann::json& j) {Send_Ranking(j); };
 }
 
 void Session::Start()
@@ -151,7 +155,7 @@ void Server::Start_Accept()
 			if (!error)
 			{
 				int sessionId = Get_SessionId();
-				_sessionMap[sessionId] = std::make_shared<Session>(std::move(socket), _context, _strand, this, sessionId);
+				_sessionMap[sessionId] = std::make_shared<Session>(std::move(socket), _context, _strand, this, sessionId, _redisManager);
 				_sessionMap[sessionId]->Start();
 			}
 
@@ -210,10 +214,15 @@ void Session::Start_Register(nlohmann::json& j)
 	}
 	else
 	{
+		//DB에 회원가입 데이터 초기화
 		Database::GetInstance().InsertUser(j["id"], j["password"], j["nickname"]);
+		//REDIS에 랭킹용 데이터 초기화
+		_redisManager.InIt_Player(j["nickname"]);
+
 		newJ["result"] = "True";
 	}
 
+	//결과를 클라이언트에게 전송
 	std::string newStr = newJ.dump();
 	newStr = Utility::fillZero(std::to_string(newStr.size()), 4) + newStr;
 	Start_Write(newStr);
@@ -275,12 +284,18 @@ void Session::Create_Room(nlohmann::json& j)
 	newStr = Utility::fillZero(std::to_string(newStr.size()), 4) + newStr;
 	Start_Write(newStr);
 
-	Refresh_PlayerInfo(_roomId);
+	_iServer->Refresh_Room_Info(_roomId);
 }
 
 void Session::Exit_Room(nlohmann::json& j)
 {
-	_iServer->Get_Room(_roomId)->DeleteSessionId(_sessionId);
+	auto room = _iServer->Get_Room(_roomId);
+
+	if (room != nullptr)
+	{
+		room->DeleteSessionId(_sessionId);
+		_iServer->Refresh_Room_Info(_roomId);
+	}
 }
 
 void Session::Refresh_Room(nlohmann::json& j)
@@ -320,31 +335,7 @@ void Session::Join_Room(nlohmann::json& j)
 	newStr = Utility::fillZero(std::to_string(newStr.size()), 4) + newStr;
 	Start_Write(newStr);
 
-	Refresh_PlayerInfo(_roomId);
-}
-
-void Session::Refresh_PlayerInfo(int roomId)
-{	
-	/*
-	일단 대충 방에 소속된 플레이어의 닉네임을 배열로 넣어서 
-	클라이언트한테 전송하는 느낌임	
-	*/
-
-	nlohmann::json newJ;
-
-	newJ["type"] = "Refresh_PlayerInfo";
-
-	newJ["nicknames"] = nlohmann::json::array();
-
-	auto list = _iServer->Get_Room(roomId)->GetSessionIdList();
-	for (auto it = list->begin(); it != list->end(); it++)
-	{
-		newJ["nicknames"].push_back(it->second);
-	}
-
-	std::string newStr = newJ.dump();
-	newStr = Utility::fillZero(std::to_string(newStr.size()), 4) + newStr;
-	Start_Write(newStr);
+	_iServer->Refresh_Room_Info(_roomId);
 }
 
 void Session::Room_Ready()
@@ -357,12 +348,14 @@ void Session::Room_Ready()
 
 	newJ["chat"] = str;
 
-
 	std::string newStr = newJ.dump();
 	newStr = Utility::fillZero(std::to_string(newStr.size()), 4) + newStr;
-
 	_iServer->Broadcast_Room_Chat(newStr, -1, _roomId);
 
+
+	_iServer->Get_Room(_roomId)->SetReady(_sessionId);
+
+	
 	/*
 	04.28
 
@@ -373,12 +366,16 @@ void Session::Room_Ready()
 	특정 작업할 때마다 서버가 방 안에 모든 플레이어한테 메세지를 전송하는데
 	Broadcast_Room_Chat 이거는 특정 id를 제외하고 보내는 방식이라 좀 다르게 작동함 
 
-	그리고 준비는하는데 준비 푸는것도 만드셈
-	
-	
+	그리고 준비는하는데 준비 푸는것도 만드셈	
 	
 	*/
+}
 
+void Session::Place_Stone(nlohmann::json& j)
+{
+	int x = j["x"];
+	int y = j["y"];
+	_iServer->Get_Room(_roomId)->Place_Gomoku_Stone(_sessionId, x, y);
 }
 
 void Session::Room_Chat(nlohmann::json& j)
@@ -393,6 +390,33 @@ void Session::Room_Chat(nlohmann::json& j)
 	_iServer->Broadcast_Room_Chat(newStr, _sessionId, _roomId);
 }
 
+void Session::Send_Ranking(nlohmann::json& j)
+{
+	nlohmann::json newJ;
+	newJ["type"] = "Send_Ranking";
+	newJ["data"] = nlohmann::json::array();
+
+	auto r = _redisManager.Get_Ranking();
+	for (int index = 0; index < r.size(); index++)
+	{
+		std::string playerName = r[index].first;
+		int rating = r[index].second;
+
+		auto m = _redisManager.Get_Player(playerName);
+
+		newJ["data"].push_back({
+			{"Rank", index + 1},
+			{"Name", playerName},
+			{ "Win", std::stoi(m["Win"])},
+			{ "Loss", std::stoi(m["Loss"]) },
+			{ "Draw", std::stoi(m["Draw"]) },
+			{ "Rating", rating }
+			});
+	}
+	std::string newStr = newJ.dump();
+	newStr = Utility::fillZero(std::to_string(newStr.size()), 4) + newStr;
+	Start_Write(newStr);
+}
 
 struct T
 {
@@ -453,7 +477,7 @@ int Server::Create_Room(int sessionId, std::string nickname, std::string roomNam
 		returnRoomId = _nextRoomId++;
 
 	//부여받은 Id로 Room 클래스 생성
-	auto newRoom = std::make_shared<Room>(returnRoomId, roomName, roomPassword, [this](int roomId) { Destroy_Room(roomId); });
+	auto newRoom = std::make_shared<Room>(this, returnRoomId, roomName, roomPassword, [this](int roomId) { Destroy_Room(roomId); }, _redisManager);
 
 	//Id와 Room을 Map으로 연결
 	_roomMap[returnRoomId] = newRoom;
@@ -496,15 +520,50 @@ std::vector<nlohmann::json> Server::Get_RoomJson()
 
 void Server::Broadcast_Room_Chat(std::string str, int id, int roomId)
 {
-	auto list = Get_Room(roomId)->GetSessionIdList();
+	auto room = Get_Room(roomId);
 
-	for (auto it = list->begin(); it != list->end(); it++)
+	if (room != nullptr)
 	{
-		int current = it->first;
+		auto list = Get_Room(roomId)->GetSessionIdList();
 
-		if (id != current)
+		for (auto it = list->begin(); it != list->end(); it++)
 		{
-			_sessionMap[current]->Send(str);
+			int current = it->sessionId;
+
+			if (id != current)
+			{
+				_sessionMap[current]->Send(str);
+			}
 		}
+	}
+}
+
+void Server::Send_Data(std::string str, int id)
+{
+	_sessionMap[id]->Send(str);
+}
+
+void Server::Refresh_Room_Info(int roomId)
+{
+	auto room = Get_Room(roomId);
+
+	if (room != nullptr)
+	{
+		nlohmann::json j;
+		j["type"] = "Refresh_PlayerInfo";
+		j["nicknames"] = nlohmann::json::array();
+
+		auto sessionList = room->GetSessionIdList();
+
+		for (auto it = sessionList->begin(); it != sessionList->end(); it++)
+			j["nicknames"].push_back(it->nickname);
+
+		std::string str = j.dump();
+		str = Utility::fillZero(std::to_string(str.size()), 4) + str;
+
+		std::cout << str << std::endl;
+
+		for (auto it = sessionList->begin(); it != sessionList->end(); it++)
+			Send_Data(str, it->sessionId);
 	}
 }

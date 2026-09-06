@@ -1,4 +1,5 @@
 mysql-connector-c++-8.1.0-winx64/
+Redis/
 x64/
 include/
 *.exe
