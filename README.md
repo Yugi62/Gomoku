@@ -12,11 +12,11 @@ Gomoku는 온라인 멀티 오목 서버입니다
 
 ### 기술스택
 ---
-+ C++
-+ Boost.Asio
-+ MySQL
-+ REDIS
-+ ImGui
++ C++ (서버 및 클라이언트 개발)
++ Boost.Asio (비동기 서버 구현)
++ MySQL (회원 및 데이터 저장)
++ REDIS (랭킹 데이터 관리)
++ ImGui (클라이언트 구현)
 
 ### 동작과정
 ---
