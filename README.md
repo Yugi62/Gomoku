@@ -11,3 +11,8 @@ TCP/SSL로 통신한다
 + Boost.Asio
 + MySQL
 + REDIS
+
+### 실제 플레이
+---
+
+<img width="400" height="285" alt="Image" src="https://github.com/user-attachments/assets/88aebb1c-9ab4-430e-bf36-6de58aa9513c" />
