@@ -4,9 +4,11 @@
 Gomoku는 온라인 멀티 오목 서버입니다
 
 + TCP/SSL로 통신
-+ MySQL로 로그인 기능 구현
++ MySQL로 로그인 기능 구현 (비밀번호 Hash + Salt 처리)
 + REDIS로 랭킹 기능 구현
-+ Boost.IOCP 기반의 Ovelapped I/O
++ Boost.IOCP 기반의 비동기 Overlapped I/O
++ 멀티스레드 기반 서버 처리
++ 방 생성 기능을 통해 여러 명의 오목 플레이가 가능 
 
 ### 기술스택
 ---
