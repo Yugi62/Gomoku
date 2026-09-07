@@ -14,6 +14,10 @@ Gomoku는 온라인 멀티 오목 서버입니다
 + MySQL
 + REDIS
 
+### 동작과정
+---
+<img width="1536" height="1024" alt="Image" src="https://github.com/user-attachments/assets/1ffb12e3-55a7-407e-8fb9-2c7c0f051028" />
+
 ### 실제 플레이
 ---
 
