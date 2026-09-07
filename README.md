@@ -6,6 +6,7 @@ Gomoku는 온라인 멀티 오목 서버입니다
 + TCP/SSL로 통신
 + MySQL로 로그인 기능 구현
 + REDIS로 랭킹 기능 구현
++ Boost.IOCP 기반의 Ovelapped I/O
 
 ### 기술스택
 ---
@@ -13,6 +14,7 @@ Gomoku는 온라인 멀티 오목 서버입니다
 + Boost.Asio
 + MySQL
 + REDIS
++ ImGui
 
 ### 동작과정
 ---
