@@ -335,6 +335,27 @@ void Session::Join_Room(nlohmann::json& j)
 	newStr = Utility::fillZero(std::to_string(newStr.size()), 4) + newStr;
 	Start_Write(newStr);
 
+	Refresh_PlayerInfo(_roomId);
+}
+
+void Session::Refresh_PlayerInfo(int roomId)
+{	
+	/*
+	방에 소속된 플레이어의 닉네임을 배열로 넣어서 
+	클라이언트한테 전송
+	*/
+
+	nlohmann::json newJ;
+
+	newJ["type"] = "Refresh_PlayerInfo";
+
+	newJ["nicknames"] = nlohmann::json::array();
+
+	auto list = _iServer->Get_Room(roomId)->GetSessionIdList();
+	for (auto it = list->begin(); it != list->end(); it++)
+	{
+		newJ["nicknames"].push_back(it->nickname);
+	}
 	_iServer->Refresh_Room_Info(_roomId);
 }
 
@@ -354,21 +375,6 @@ void Session::Room_Ready()
 
 
 	_iServer->Get_Room(_roomId)->SetReady(_sessionId);
-
-	
-	/*
-	04.28
-
-	일단 시간 없어서 Broadcast_Room_Chat를 썼는데
-
-	나중에 따로 함수 만드셈
-
-	특정 작업할 때마다 서버가 방 안에 모든 플레이어한테 메세지를 전송하는데
-	Broadcast_Room_Chat 이거는 특정 id를 제외하고 보내는 방식이라 좀 다르게 작동함 
-
-	그리고 준비는하는데 준비 푸는것도 만드셈	
-	
-	*/
 }
 
 void Session::Place_Stone(nlohmann::json& j)
@@ -526,9 +532,9 @@ void Server::Broadcast_Room_Chat(std::string str, int id, int roomId)
 	{
 		auto list = Get_Room(roomId)->GetSessionIdList();
 
-		for (auto it = list->begin(); it != list->end(); it++)
-		{
-			int current = it->sessionId;
+	for (auto it = list->begin(); it != list->end(); it++)
+	{
+		int current = it->sessionId;
 
 			if (id != current)
 			{

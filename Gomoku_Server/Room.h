@@ -35,13 +35,17 @@ private:
 	std::vector<Player> _sessionIdList;
 	//Server에게 RoomID 반환 및 Map 요소 삭제
 	std::function<void(int)> _destroy_room_callback;
-	//Room 안에서 ready한 플레이어의 수
+
+	//오목 클래스
+	Gomoku gomoku;
+	//REDIS 메니저
+	RedisManager& _redisManager;
+	//서버의 기능을 사용하기 위한 인터페이스
+	IServer* _iServer;
+	//현재 방 안에서 준비 중인 플레이어의 수
 	int readyCnt = 0;
 
-	IServer* _iServer;
-	Gomoku gomoku;
 
-	RedisManager& _redisManager;
 
 public:
 	Room(IServer* iServer, int roomId, std::string roomName, std::string roomPassword, std::function<void(int)> func, RedisManager& redisManager);
@@ -54,7 +58,7 @@ public:
 	bool VerifyPassword(std::string password);
 	//SessionList 가져오기
 	const std::vector<Player>* GetSessionIdList();
-	//게임 준비 설정 (모든 플레이어가 준비된 경우 게임 시작)
+
 	void SetReady(int sessionId);
 
 	//착수

@@ -26,7 +26,7 @@ private:
 	IServer* _iServer;
 	//서버에서 각 세션을 구분하기 위한 ID
 	unsigned int _sessionId;
-	//이거 id만으로는 정확하게 room에 있는지 없는지 확인이 어려우니깐 bool이라도 만들어야함
+	//방 식별용 ID
 	unsigned int _roomId;
 	//세션에 연결된 클라이언트의 닉네임
 	std::string _nickname;
@@ -72,7 +72,7 @@ private:
 	//작업 선별
 	void Start_Dispatch(std::string str);
 
-
+	void Refresh_PlayerInfo(int roomId);
 
 public:
 	Session(
